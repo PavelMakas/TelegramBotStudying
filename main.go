@@ -52,9 +52,15 @@ func main() {
 				style = strings.ToLower(args)
 			}
 
-			story, err := handlers.GenerateStory(style, cfg.OpenAIAPIKey)
+			story, err := handlers.GenerateStory(style, "")
 			if err != nil {
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Sorry, I couldn't generate a story at this time.")
+				errorMsg := "Sorry, I couldn't generate a story at this time. "
+				if strings.Contains(err.Error(), "insufficient_quota") {
+					errorMsg += "The API quota has been exceeded. Please try again later."
+				} else {
+					errorMsg += "Please try again later."
+				}
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, errorMsg)
 				bot.Send(msg)
 				continue
 			}

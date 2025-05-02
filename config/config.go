@@ -8,17 +8,18 @@ import (
 
 type Config struct {
 	TelegramBotToken string
-	OpenAIAPIKey     string
 }
 
 func LoadConfig() (*Config, error) {
-	err := godotenv.Load()
-	if err != nil {
-		return nil, err
+	// Try to load .env file, but don't fail if it doesn't exist
+	_ = godotenv.Load()
+
+	telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if telegramToken == "" {
+		telegramToken = "8075731455:AAG_rbshHzEbIoFu-qjKWbWy_VVbH6P710c"
 	}
 
 	return &Config{
-		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
-		OpenAIAPIKey:     os.Getenv("OPENAI_API_KEY"),
+		TelegramBotToken: telegramToken,
 	}, nil
 }

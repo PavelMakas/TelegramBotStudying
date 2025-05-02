@@ -7,29 +7,16 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"telegram-bot/utils"
 )
 
 type StoryRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type StoryResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Error *struct {
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
+	Inputs     string `json:"inputs"`
+	Parameters struct {
+		MaxLength int `json:"max_length"`
+	} `json:"parameters"`
 }
 
 func HandleMessage(message string) string {
@@ -37,19 +24,14 @@ func HandleMessage(message string) string {
 }
 
 func GenerateStory(style string, apiKey string) (string, error) {
-	prompt := fmt.Sprintf("Generate a short %s story (maximum 400 characters).", style)
+	prompt := fmt.Sprintf("Write a short %s story in 400 characters or less:", style)
 
 	reqBody := StoryRequest{
-		Model: "gpt-3.5-turbo",
-		Messages: []Message{
-			{
-				Role:    "system",
-				Content: "You are a creative storyteller. Keep stories under 400 characters.",
-			},
-			{
-				Role:    "user",
-				Content: prompt,
-			},
+		Inputs: prompt,
+		Parameters: struct {
+			MaxLength int `json:"max_length"`
+		}{
+			MaxLength: 400,
 		},
 	}
 
@@ -59,14 +41,14 @@ func GenerateStory(style string, apiKey string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://api-inference.huggingface.co/models/gpt2", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
 		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer hf_DDmXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXq")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -83,25 +65,27 @@ func GenerateStory(style string, apiKey string) (string, error) {
 	}
 
 	// Log the response for debugging
-	log.Printf("OpenAI API Response: %s", string(body))
+	log.Printf("API Response: %s", string(body))
 
-	var storyResp StoryResponse
+	var storyResp []struct {
+		GeneratedText string `json:"generated_text"`
+	}
+
 	if err := json.Unmarshal(body, &storyResp); err != nil {
 		log.Printf("Error unmarshaling response: %v", err)
 		return "", err
 	}
 
-	if storyResp.Error != nil {
-		log.Printf("OpenAI API Error: %s", storyResp.Error.Message)
-		return "", fmt.Errorf("OpenAI API error: %s", storyResp.Error.Message)
-	}
-
-	if len(storyResp.Choices) == 0 {
-		log.Printf("No choices in response")
+	if len(storyResp) == 0 {
+		log.Printf("No story generated")
 		return "", fmt.Errorf("no story generated")
 	}
 
-	story := storyResp.Choices[0].Message.Content
+	story := storyResp[0].GeneratedText
+	// Clean up the story by removing the prompt and extra whitespace
+	story = strings.TrimPrefix(story, prompt)
+	story = strings.TrimSpace(story)
+
 	if len(story) > 400 {
 		story = story[:397] + "..."
 	}
