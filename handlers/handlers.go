@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"telegram-bot/utils"
@@ -26,6 +27,9 @@ type StoryResponse struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
 }
 
 func HandleMessage(message string) string {
@@ -51,11 +55,13 @@ func GenerateStory(style string, apiKey string) (string, error) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
+		log.Printf("Error marshaling request: %v", err)
 		return "", err
 	}
 
 	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("Error creating request: %v", err)
 		return "", err
 	}
 
@@ -65,21 +71,33 @@ func GenerateStory(style string, apiKey string) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("Error making request: %v", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("Error reading response body: %v", err)
 		return "", err
 	}
+
+	// Log the response for debugging
+	log.Printf("OpenAI API Response: %s", string(body))
 
 	var storyResp StoryResponse
 	if err := json.Unmarshal(body, &storyResp); err != nil {
+		log.Printf("Error unmarshaling response: %v", err)
 		return "", err
 	}
 
+	if storyResp.Error != nil {
+		log.Printf("OpenAI API Error: %s", storyResp.Error.Message)
+		return "", fmt.Errorf("OpenAI API error: %s", storyResp.Error.Message)
+	}
+
 	if len(storyResp.Choices) == 0 {
+		log.Printf("No choices in response")
 		return "", fmt.Errorf("no story generated")
 	}
 
