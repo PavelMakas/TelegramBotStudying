@@ -41,14 +41,14 @@ func GenerateStory(style string, apiKey string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", "https://api-inference.huggingface.co/models/gpt2", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
 		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer hf_DDmXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXq")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

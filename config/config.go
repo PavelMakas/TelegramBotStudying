@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	TelegramBotToken string
+	TelegramBotToken  string
+	HuggingFaceAPIKey string
 }
 
 func LoadConfig() (*Config, error) {
@@ -19,7 +20,9 @@ func LoadConfig() (*Config, error) {
 		telegramToken = "8075731455:AAG_rbshHzEbIoFu-qjKWbWy_VVbH6P710c"
 	}
 
+	huggingFaceKey := os.Getenv("HUGGINGFACE_API_KEY")
 	return &Config{
-		TelegramBotToken: telegramToken,
+		TelegramBotToken:  telegramToken,
+		HuggingFaceAPIKey: huggingFaceKey,
 	}, nil
 }

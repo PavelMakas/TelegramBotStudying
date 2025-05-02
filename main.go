@@ -52,7 +52,7 @@ func main() {
 				style = strings.ToLower(args)
 			}
 
-			story, err := handlers.GenerateStory(style, "")
+			story, err := handlers.GenerateStory(style, cfg.HuggingFaceAPIKey)
 			if err != nil {
 				errorMsg := "Sorry, I couldn't generate a story at this time. "
 				if strings.Contains(err.Error(), "insufficient_quota") {
