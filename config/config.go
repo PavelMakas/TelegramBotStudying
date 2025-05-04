@@ -1,28 +1,18 @@
 package config
 
 import (
-	"os"
-
-	"github.com/joho/godotenv"
+	"log"
 )
 
 type Config struct {
-	TelegramBotToken  string
-	HuggingFaceAPIKey string
+	TelegramBotToken string
+	OpenAIAPIKey     string
 }
 
 func LoadConfig() (*Config, error) {
-	// Try to load .env file, but don't fail if it doesn't exist
-	_ = godotenv.Load()
-
-	telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
-	if telegramToken == "" {
-		telegramToken = "8075731455:AAG_rbshHzEbIoFu-qjKWbWy_VVbH6P710c"
-	}
-
-	huggingFaceKey := os.Getenv("HUGGINGFACE_API_KEY")
+	log.Printf("Config loaded successfully")
 	return &Config{
-		TelegramBotToken:  telegramToken,
-		HuggingFaceAPIKey: huggingFaceKey,
+		TelegramBotToken: APIKeys.TelegramBotToken,
+		OpenAIAPIKey:     APIKeys.OpenAIAPIKey,
 	}, nil
 }

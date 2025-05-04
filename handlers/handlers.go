@@ -8,15 +8,19 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"unicode"
 
 	"telegram-bot/utils"
 )
 
-type StoryRequest struct {
-	Inputs     string `json:"inputs"`
-	Parameters struct {
-		MaxLength int `json:"max_length"`
-	} `json:"parameters"`
+type OpenAIRequest struct {
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
+}
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 func HandleMessage(message string) string {
@@ -24,14 +28,24 @@ func HandleMessage(message string) string {
 }
 
 func GenerateStory(style string, apiKey string) (string, error) {
-	prompt := fmt.Sprintf("Write a short %s story in 400 characters or less:", style)
+	log.Printf("Starting story generation with style: %s", style)
 
-	reqBody := StoryRequest{
-		Inputs: prompt,
-		Parameters: struct {
-			MaxLength int `json:"max_length"`
-		}{
-			MaxLength: 400,
+	if apiKey == "" {
+		log.Printf("Error: API key is empty")
+		return "", fmt.Errorf("API key is required")
+	}
+
+	log.Printf("API Key length: %d", len(apiKey))
+	prompt := fmt.Sprintf("Write a short %s story. The story should be engaging and creative, but not exceed 1000 characters (excluding spaces and punctuation). Focus on making it memorable and complete:", style)
+	log.Printf("Generated prompt: %s", prompt)
+
+	reqBody := OpenAIRequest{
+		Model: "gpt-3.5-turbo",
+		Messages: []Message{
+			{
+				Role:    "user",
+				Content: prompt,
+			},
 		},
 	}
 
@@ -41,7 +55,7 @@ func GenerateStory(style string, apiKey string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
 		return "", err
@@ -58,6 +72,9 @@ func GenerateStory(style string, apiKey string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	// Add status code logging
+	log.Printf("API Response Status: %s", resp.Status)
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Error reading response body: %v", err)
@@ -65,29 +82,54 @@ func GenerateStory(style string, apiKey string) (string, error) {
 	}
 
 	// Log the response for debugging
-	log.Printf("API Response: %s", string(body))
+	log.Printf("API Response Body: %s", string(body))
 
-	var storyResp []struct {
-		GeneratedText string `json:"generated_text"`
+	var openaiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Error *struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    string `json:"code"`
+		} `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &storyResp); err != nil {
-		log.Printf("Error unmarshaling response: %v", err)
+	if err := json.Unmarshal(body, &openaiResp); err != nil {
+		log.Printf("Error unmarshaling response: %v\nResponse body: %s", err, string(body))
 		return "", err
 	}
 
-	if len(storyResp) == 0 {
+	if openaiResp.Error != nil {
+		log.Printf("OpenAI API error: %s\nFull response: %s", openaiResp.Error.Message, string(body))
+		return "", fmt.Errorf("OpenAI API error: %s", openaiResp.Error.Message)
+	}
+
+	if len(openaiResp.Choices) == 0 {
 		log.Printf("No story generated")
 		return "", fmt.Errorf("no story generated")
 	}
 
-	story := storyResp[0].GeneratedText
-	// Clean up the story by removing the prompt and extra whitespace
-	story = strings.TrimPrefix(story, prompt)
-	story = strings.TrimSpace(story)
+	story := strings.TrimSpace(openaiResp.Choices[0].Message.Content)
 
-	if len(story) > 400 {
-		story = story[:397] + "..."
+	// Remove spaces and punctuation for character count
+	storyWithoutSpaces := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || unicode.IsPunct(r) {
+			return -1
+		}
+		return r
+	}, story)
+
+	if len(storyWithoutSpaces) > 1000 {
+		// Find the last complete word within the limit
+		lastSpace := strings.LastIndex(story[:1000], " ")
+		if lastSpace > 0 {
+			story = story[:lastSpace] + "..."
+		} else {
+			story = story[:997] + "..."
+		}
 	}
 
 	return story, nil
